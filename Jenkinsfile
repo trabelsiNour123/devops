@@ -1,55 +1,60 @@
 pipeline {
     agent any
 
-    tools {
-        maven 'M2_HOME'
-        jdk 'JAVA_HOME'
-    }
-
     environment {
-        IMAGE_NAME = 'trabelsinour123/devops-app'
-        IMAGE_TAG  = "${env.BUILD_NUMBER}"
+        // À adapter avec TON pseudo Docker Hub
+        REGISTRY = 'trabelsinour123/devops'            // Docker Hub
+        // Si tu préfères GitHub Container Registry :
+        // REGISTRY = 'ghcr.io/trabelsinour123/devops'
+        DOCKER_CREDENTIALS = 'dockerhub-trabelsi'      // ID des credentials dans Jenkins
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
     }
 
     stages {
-        stage('Checkout Code') {
+        stage('Récupération du code') {
             steps {
+                echo "Checkout du dépôt GitHub..."
                 checkout scm
-                sh 'ls -la'
             }
         }
 
-        stage('Maven Clean Package') {
+        stage('Nettoyage et compilation') {
             steps {
-                sh 'mvn clean package -DskipTests'
+                echo "Nettoyage et compilation Maven..."
+                sh './mvnw clean package -DskipTests'
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Construction de l\'image Docker') {
             steps {
-                sh '''
-                docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
-                docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest
-                '''
+                script {
+                    dockerImage = docker.build("${REGISTRY}:${IMAGE_TAG}")
+                    dockerImageLatest = docker.build("${REGISTRY}:latest")
+                }
             }
         }
 
-        stage('Push to Docker Hub') {
+        stage('Push de l\'image sur Docker Hub') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'docker-hub-nour', 
-                                 usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-                    sh '''
-                    echo $PASS | docker login -u $USER --password-stdin
-                    docker push ${IMAGE_NAME}:${IMAGE_TAG}
-                    docker push ${IMAGE_NAME}:latest
-                    '''
+                script {
+                    docker.withRegistry('https://index.docker.io/v1/', DOCKER_CREDENTIALS) {
+                        dockerImage.push()
+                        dockerImageLatest.push()
+                    }
                 }
             }
         }
     }
 
     post {
-        success { echo 'Pipeline CI/CD terminé avec succès – Image publiée !' }
-        always  { cleanWs() }
+        always {
+            cleanWs()                        // Très important pour la validation
+        }
+        success {
+            echo "Pipeline terminé avec succès ! Image disponible : ${REGISTRY}:${IMAGE_TAG}"
+        }
+        failure {
+            echo "Échec de la pipeline"
+        }
     }
 }
