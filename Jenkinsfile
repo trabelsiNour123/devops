@@ -2,11 +2,8 @@ pipeline {
     agent any
 
     environment {
-        // À adapter avec TON pseudo Docker Hub
-        REGISTRY = 'trabelsinour123/devops'            // Docker Hub
-        // Si tu préfères GitHub Container Registry :
-        // REGISTRY = 'ghcr.io/trabelsinour123/devops'
-        DOCKER_CREDENTIALS = 'dockerhub-trabelsi'      // ID des credentials dans Jenkins
+        REGISTRY = 'trabelsinour123/devops'
+        DOCKER_CREDENTIALS = 'dockerhub-trabelsi'
         IMAGE_TAG = "${env.BUILD_NUMBER}"
     }
 
@@ -21,6 +18,7 @@ pipeline {
         stage('Nettoyage et compilation') {
             steps {
                 echo "Nettoyage et compilation Maven..."
+                sh 'chmod +x ./mvnw'                    // ← Correction du bug
                 sh './mvnw clean package -DskipTests'
             }
         }
@@ -48,10 +46,10 @@ pipeline {
 
     post {
         always {
-            cleanWs()                        // Très important pour la validation
+            cleanWs()
         }
         success {
-            echo "Pipeline terminé avec succès ! Image disponible : ${REGISTRY}:${IMAGE_TAG}"
+            echo "Pipeline réussie ! Image : ${REGISTRY}:${IMAGE_TAG}"
         }
         failure {
             echo "Échec de la pipeline"
